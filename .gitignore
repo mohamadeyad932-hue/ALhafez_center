@@ -1,0 +1,36 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+venv_old/
+eya/
+
+# Secrets
+.env
+*.env
+
+# Next.js
+node_modules/
+.next/
+out/
+build/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+
+# Database
+*.sqlite
+*.db
+backup_full.sql
+backup_*.sql
+
+# AI & Bot
+ai/__pycache__/
+ai/chroma_db/
+chroma_db_v2/
+knowledge_base/

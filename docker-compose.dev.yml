@@ -1,0 +1,103 @@
+# ============================================================
+# ALhafez Center - Docker Compose (Development)
+# ============================================================
+# الاستخدام:
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+# يعطيك Hot-Reload للواجهة الأمامية والخلفية
+# ============================================================
+
+services:
+
+  # ==================== PostgreSQL Database ====================
+  db:
+    image: postgres:16-alpine
+    container_name: hafaz-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hafaz_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hafaz_secure_password_2024}
+      POSTGRES_DB: ${POSTGRES_DB:-alhafaz_center}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - hafaz-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hafaz_user} -d ${POSTGRES_DB:-alhafaz_center}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ==================== Backend (FastAPI + AI) - Dev Mode ====================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: hafaz-backend-dev
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://hafaz_user:hafaz_secure_password_2024@db:5432/alhafaz_center}
+      SECRET_KEY: ${SECRET_KEY:-hafaze-store-super-secret-key-change-in-production}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      DEFAULT_ADMIN_USER: ${DEFAULT_ADMIN_USER:-eyad_moh14}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-1234567##a}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-models/text-embedding-004}
+      CHROMA_ANONYMIZED_TELEMETRY: ${CHROMA_ANONYMIZED_TELEMETRY:-False}
+      APP_NAME: ${APP_NAME:-صالة الحافظ للقطع الكهربائية}
+      DEBUG: "True"
+    volumes:
+      # Mount source code for hot-reload
+      - ./backend:/app/backend
+      - ./ai:/app/ai
+    ports:
+      - "8001:8001"
+    networks:
+      - hafaz-network-dev
+    depends_on:
+      db:
+        condition: service_healthy
+    # Override CMD to enable reload
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "/app/backend", "--reload-dir", "/app/ai"]
+
+  # ==================== Frontend (Next.js) - Dev Mode ====================
+  frontend:
+    build:
+      context: .
+      dockerfile: front/Dockerfile
+      target: deps
+    container_name: hafaz-frontend-dev
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-صالة الحافظ للقطع الكهربائية}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    volumes:
+      # Mount source code for hot-reload
+      - ./front:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - hafaz-network-dev
+    depends_on:
+      - backend
+    command: ["npm", "run", "dev"]
+
+
+# ==================== Volumes ====================
+volumes:
+  postgres_data_dev:
+    driver: local
+
+
+# ==================== Networks ====================
+networks:
+  hafaz-network-dev:
+    driver: bridge
